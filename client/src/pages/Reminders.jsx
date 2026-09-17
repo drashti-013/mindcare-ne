@@ -95,7 +95,7 @@ export default function Reminders({ user }) {
           }
         : f;
 
-      await api.post('/reminders', payload);
+      const res = await api.post('/reminders', payload);
 
       setF({
         medicine: '',
@@ -112,9 +112,17 @@ export default function Reminders({ user }) {
       load();
       loadAI();
 
-      setTestMsg(
-        'Medicine reminder saved. Email and SMS are selected for this reminder.'
-      );
+      let msg = 'Medicine reminder saved.';
+      if (res.data?.emailSent && res.data?.smsSent) {
+        msg = `✅ Medicine plan saved! Email and SMS sent to ${isDoctor ? 'the patient' : 'your contact'}.`;
+      } else if (res.data?.emailSent) {
+        msg = `✅ Medicine plan saved! Confirmation email sent to ${isDoctor ? 'the patient' : 'your email'}.`;
+      } else if (res.data?.smsSent) {
+        msg = `✅ Medicine plan saved! Confirmation SMS sent to ${isDoctor ? 'the patient' : 'your phone'}.`;
+      } else {
+        msg = '✅ Medicine reminder saved. Scheduled reminders will trigger at the prescribed time.';
+      }
+      setTestMsg(msg);
     } catch (e) {
       alert(
         e.response?.data?.message || 'Could not save reminder'
@@ -252,21 +260,6 @@ export default function Reminders({ user }) {
             </div>
           </div>
 
-          <div className="delivery-actions">
-            <button
-              className="secondary"
-              onClick={() => test('email')}
-            >
-              <Mail /> Test Email
-            </button>
-
-            <button
-              className="secondary"
-              onClick={() => test('sms')}
-            >
-              <MessageSquare /> Test SMS
-            </button>
-          </div>
 
           {testMsg && (
             <div className="delivery-message">
@@ -276,8 +269,8 @@ export default function Reminders({ user }) {
         </section>
       )}
 
-      {/* Add reminder / Doctor medicine plan */}
-      {(!professional || isDoctor) && (
+      {/* Doctor medicine plan */}
+      {isDoctor && (
         <form className="panel" onSubmit={add}>
           <h3>
             <Plus />{' '}
@@ -372,41 +365,39 @@ export default function Reminders({ user }) {
             }
           />
 
-          {!isDoctor && (
-            <div className="notify-options">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={f.notifyEmail}
-                  onChange={(e) =>
-                    setF({
-                      ...f,
-                      notifyEmail: e.target.checked
-                    })
-                  }
-                />
+          <div className="notify-options">
+            <label>
+              <input
+                type="checkbox"
+                checked={f.notifyEmail}
+                onChange={(e) =>
+                  setF({
+                    ...f,
+                    notifyEmail: e.target.checked
+                  })
+                }
+              />
 
-                <Mail size={15} />
-                Send to my email
-              </label>
+              <Mail size={15} />
+              {isDoctor ? 'Notify patient via email' : 'Send to my email'}
+            </label>
 
-              <label>
-                <input
-                  type="checkbox"
-                  checked={f.notifySms}
-                  onChange={(e) =>
-                    setF({
-                      ...f,
-                      notifySms: e.target.checked
-                    })
-                  }
-                />
+            <label>
+              <input
+                type="checkbox"
+                checked={f.notifySms}
+                onChange={(e) =>
+                  setF({
+                    ...f,
+                    notifySms: e.target.checked
+                  })
+                }
+              />
 
-                <MessageSquare size={15} />
-                Send to my phone (SMS)
-              </label>
-            </div>
-          )}
+              <MessageSquare size={15} />
+              {isDoctor ? 'Notify patient via SMS' : 'Send to my phone (SMS)'}
+            </label>
+          </div>
 
           <button className="primary">
             <Bell />
@@ -416,12 +407,16 @@ export default function Reminders({ user }) {
               : 'Save reminder'}
           </button>
 
+          {testMsg && (
+            <div className="delivery-message" style={{ marginTop: '12px' }}>
+              {testMsg}
+            </div>
+          )}
+
           <div className="note">
             <ShieldCheck size={16} />
 
-            Email uses SMTP. SMS uses Twilio. The app will only
-            report a message as sent when the configured provider
-            accepts it.
+            Email notifications are delivered via SMTP. SMS is delivered via Twilio.
           </div>
         </form>
       )}
@@ -480,26 +475,17 @@ export default function Reminders({ user }) {
               <strong>{x.time}</strong>
 
               {!professional && (
-                <>
-                  <button
-                    className={
-                      x.taken
-                        ? 'done icon'
-                        : 'icon'
-                    }
-                    onClick={() => toggle(x)}
-                    title="Mark taken"
-                  >
-                    <Check />
-                  </button>
-
-                  <button
-                    className="icon danger"
-                    onClick={() => del(x._id)}
-                  >
-                    <Trash2 />
-                  </button>
-                </>
+                <button
+                  className={
+                    x.taken
+                      ? 'done icon'
+                      : 'icon'
+                  }
+                  onClick={() => toggle(x)}
+                  title="Mark taken"
+                >
+                  <Check />
+                </button>
               )}
             </div>
           ))}
