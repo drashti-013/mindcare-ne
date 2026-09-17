@@ -32,6 +32,18 @@ export default function Reminders({ user }) {
   // Doctor states
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState('');
+  const [customMedicine, setCustomMedicine] = useState('');
+  const medicineOptions = [
+    'Paracetamol',
+    'Ibuprofen',
+    'Vitamin D',
+    'Amlodipine',
+    'Metformin',
+    'Omeprazole',
+    'Amoxicillin',
+    'Insulin',
+    'Other'
+  ];
 
   const [f, setF] = useState({
     medicine: '',
@@ -62,38 +74,57 @@ export default function Reminders({ user }) {
       .catch(() => {});
 
   useEffect(() => {
-    load();
+    const refresh = () => {
+      load();
 
-    if (isDoctor) {
-      api
-        .get('/assessments/patients')
-        .then((r) => {
-          setPatients((r.data || []).map((x) => x.patient));
-        })
-        .catch(() => {});
-    }
+      if (isDoctor) {
+        api
+          .get('/assessments/patients')
+          .then((r) => {
+            setPatients((r.data || []).map((x) => x.patient));
+          })
+          .catch(() => {});
+      }
 
-    if (!professional) {
-      loadAI();
-      loadStatus();
+      if (!professional) {
+        loadAI();
+        loadStatus();
 
-      api
-        .get('/auth/me')
-        .then((r) => setProfile(r.data.user))
-        .catch(() => {});
-    }
+        api
+          .get('/auth/me')
+          .then((r) => setProfile(r.data.user))
+          .catch(() => {});
+      }
+    };
+
+    refresh();
+    const timer = setInterval(refresh, 15000);
+    return () => clearInterval(timer);
   }, [user, isDoctor, professional]);
 
   const add = async (e) => {
     e.preventDefault();
 
     try {
+      const medicineName = f.medicine === 'Other'
+        ? customMedicine.trim()
+        : f.medicine;
+
+      if (!medicineName) {
+        alert('Please select or enter a medicine name.');
+        return;
+      }
+
       const payload = isDoctor
         ? {
             ...f,
+            medicine: medicineName,
             userId: selectedPatient
           }
-        : f;
+        : {
+            ...f,
+            medicine: medicineName
+          };
 
       const res = await api.post('/reminders', payload);
 
@@ -107,6 +138,7 @@ export default function Reminders({ user }) {
         notifySms: true
       });
 
+      setCustomMedicine('');
       setSelectedPatient('');
 
       load();
@@ -302,9 +334,8 @@ export default function Reminders({ user }) {
             </select>
           )}
 
-          <input
-            placeholder="Medicine name"
-            value={f.medicine}
+          <select
+            value={f.medicine || ''}
             onChange={(e) =>
               setF({
                 ...f,
@@ -312,7 +343,23 @@ export default function Reminders({ user }) {
               })
             }
             required
-          />
+          >
+            <option value="">Select medicine</option>
+            {medicineOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+
+          {f.medicine === 'Other' && (
+            <input
+              placeholder="Type medicine name"
+              value={customMedicine}
+              onChange={(e) => setCustomMedicine(e.target.value)}
+              required
+            />
+          )}
 
           <input
             placeholder="Dosage e.g. 1 tablet"
